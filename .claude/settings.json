@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create:*)",
+      "Bash(npx create-vite@latest . --template react-ts)",
+      "Bash(npx --yes create-vite@latest taskman_temp --template react-ts)",
+      "Bash(cp taskman_temp/package.json .)",
+      "Bash(cp taskman_temp/index.html .)",
+      "Bash(cp taskman_temp/vite.config.ts .)",
+      "Bash(cp taskman_temp/tsconfig.json .)",
+      "Bash(cp taskman_temp/tsconfig.app.json .)",
+      "Bash(npx tailwindcss:*)",
+      "Bash(\"c:/Users/aliye/Desktop/Projects/TaskMan/TaskManFront/.env.local\")",
+      "Bash(python manage.py makemigrations attachments --name add_project_to_attachment)",
+      "Bash(./venv/Scripts/python manage.py makemigrations attachments --name add_project_to_attachment)",
+      "Bash(./venv/Scripts/python manage.py migrate)",
+      "Bash(./venv/Scripts/python manage.py makemigrations notifications --name add_admin_broadcast_type)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\aliye\\Desktop\\Projects\\TaskMan\\TaskManBack\\apps\\tasks",
+      "C:\\Users\\aliye\\Desktop\\Projects\\TaskMan\\TaskManBack\\apps\\comments",
+      "C:\\Users\\aliye\\Desktop\\Projects\\TaskMan\\TaskManBack\\apps\\attachments",
+      "C:\\Users\\aliye\\Desktop\\Projects\\TaskMan\\TaskManBack\\apps\\projects",
+      "C:\\Users\\aliye\\Desktop\\Projects\\TaskMan\\TaskManBack\\apps\\notifications"
+    ]
+  }
+}
