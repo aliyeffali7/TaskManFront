@@ -13,6 +13,9 @@ export const createDriveFolder = (data: { name: string; parent?: number | null }
 export const deleteDriveFolder = (id: number) =>
   api.delete(`/drive/folders/${id}/`).then((r) => r.data);
 
+export const renameDriveFolder = (id: number, name: string) =>
+  api.patch<DriveFolder>(`/drive/folders/${id}/`, { name }).then((r) => r.data);
+
 export const uploadDriveFile = (file: File, folderId: number | null) => {
   const form = new FormData();
   form.append('file', file);

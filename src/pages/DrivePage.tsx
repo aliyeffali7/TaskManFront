@@ -2,12 +2,12 @@ import { useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Folder, FolderOpen, FileText, Upload, FolderPlus,
-  Download, Trash2, ChevronRight, Loader2, Check, X,
+  Download, Trash2, ChevronRight, Loader2, Check, X, Pencil,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   getDriveRoot, getDriveFolder, createDriveFolder,
-  deleteDriveFolder, uploadDriveFile, deleteDriveFile, downloadDriveFile,
+  deleteDriveFolder, renameDriveFolder, uploadDriveFile, deleteDriveFile, downloadDriveFile,
 } from '../api/drive';
 import type { DriveFolder, DriveFile } from '../types';
 
@@ -58,47 +58,108 @@ function Breadcrumb({ path, onNavigate }: { path: Crumb[]; onNavigate: (index: n
 // ─── folder card ────────────────────────────────────────────────────────────
 
 function FolderCard({
-  folder, onOpen, onDelete,
-}: { folder: DriveFolder; onOpen: () => void; onDelete: () => void }) {
-  const [confirm, setConfirm] = useState(false);
+  folder, onOpen, onDelete, onRename,
+}: { folder: DriveFolder; onOpen: () => void; onDelete: () => void; onRename: (name: string) => void }) {
+  const [mode, setMode] = useState<'view' | 'rename' | 'confirm-delete'>('view');
+  const [renameValue, setRenameValue] = useState('');
+
   const sub = [
     folder.children_count > 0 ? `${folder.children_count} folder${folder.children_count !== 1 ? 's' : ''}` : null,
     folder.files_count > 0 ? `${folder.files_count} file${folder.files_count !== 1 ? 's' : ''}` : null,
   ].filter(Boolean).join(', ') || 'Empty';
 
+  function startRename(e: React.MouseEvent) {
+    e.stopPropagation();
+    setRenameValue(folder.name);
+    setMode('rename');
+  }
+
+  function submitRename(e: React.MouseEvent | React.KeyboardEvent) {
+    e.stopPropagation();
+    if (renameValue.trim() && renameValue.trim() !== folder.name) {
+      onRename(renameValue.trim());
+    }
+    setMode('view');
+  }
+
+  if (mode === 'rename') {
+    return (
+      <div className="bg-white border border-blue-300 rounded-xl p-4 shadow-sm" onClick={(e) => e.stopPropagation()}>
+        <div className="p-2 bg-amber-50 border border-amber-100 rounded-lg w-fit mb-3">
+          <FolderOpen size={18} className="text-amber-500" />
+        </div>
+        <input
+          autoFocus
+          value={renameValue}
+          onChange={(e) => setRenameValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') submitRename(e);
+            if (e.key === 'Escape') setMode('view');
+          }}
+          className="w-full text-sm border border-zinc-300 rounded-lg px-2.5 py-1.5 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+        />
+        <div className="flex gap-1.5">
+          <button
+            onClick={submitRename}
+            disabled={!renameValue.trim()}
+            className="flex items-center gap-1 px-2.5 py-1 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          >
+            <Check size={11} /> Save
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); setMode('view'); }}
+            className="flex items-center gap-1 px-2.5 py-1 border border-zinc-300 text-zinc-500 text-xs font-medium rounded-lg hover:bg-zinc-50"
+          >
+            <X size={11} /> Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="group relative bg-white border border-zinc-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer"
+    <div
+      className="group relative bg-white border border-zinc-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer"
       onClick={onOpen}
     >
       <div className="flex items-start justify-between mb-3">
         <div className="p-2 bg-amber-50 border border-amber-100 rounded-lg">
           <Folder size={18} className="text-amber-500" />
         </div>
-        {/* Delete button – stop propagation so click doesn't open folder */}
-        <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-          {confirm ? (
+        {/* Actions — stop propagation so clicks don't open folder */}
+        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+          {mode === 'confirm-delete' ? (
             <div className="flex items-center gap-1">
               <button
-                onClick={() => onDelete()}
+                onClick={(e) => { e.stopPropagation(); onDelete(); }}
                 className="px-2 py-0.5 rounded text-[11px] bg-red-600 text-white hover:bg-red-700"
               >
                 Delete
               </button>
               <button
-                onClick={() => setConfirm(false)}
+                onClick={(e) => { e.stopPropagation(); setMode('view'); }}
                 className="px-2 py-0.5 rounded text-[11px] text-zinc-400 hover:bg-zinc-100"
               >
                 Cancel
               </button>
             </div>
           ) : (
-            <button
-              onClick={() => setConfirm(true)}
-              className="p-1 rounded text-zinc-300 hover:text-red-500 hover:bg-red-50 transition-colors"
-              title="Delete folder"
-            >
-              <Trash2 size={13} />
-            </button>
+            <>
+              <button
+                onClick={startRename}
+                className="p-1 rounded text-zinc-300 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+                title="Rename folder"
+              >
+                <Pencil size={13} />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setMode('confirm-delete'); }}
+                className="p-1 rounded text-zinc-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                title="Delete folder"
+              >
+                <Trash2 size={13} />
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -247,6 +308,12 @@ export default function DrivePage() {
     onError: () => toast.error('Failed to delete folder'),
   });
 
+  const renameFolderMutation = useMutation({
+    mutationFn: ({ id, name }: { id: number; name: string }) => renameDriveFolder(id, name),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey }); toast.success('Folder renamed'); },
+    onError: () => toast.error('Failed to rename folder'),
+  });
+
   const uploadMutation = useMutation({
     mutationFn: (file: File) => uploadDriveFile(file, currentFolderId),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey }); toast.success('File uploaded'); },
@@ -326,6 +393,7 @@ export default function DrivePage() {
                     folder={folder}
                     onOpen={() => navigateInto(folder)}
                     onDelete={() => deleteFolderMutation.mutate(folder.id)}
+                    onRename={(name) => renameFolderMutation.mutate({ id: folder.id, name })}
                   />
                 ))}
               </div>

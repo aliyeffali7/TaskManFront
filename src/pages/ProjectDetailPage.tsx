@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Upload, FileText, Download, Loader2, Users, X, Check } from 'lucide-react';
+import { Plus, Upload, FileText, Download, Loader2, Users, X, Check, Trash2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
-import { getProject, getProjectFiles, uploadProjectFile, updateProject, downloadProjectFile } from '../api/projects';
+import { getProject, getProjectFiles, uploadProjectFile, updateProject, downloadProjectFile, deleteProjectFile } from '../api/projects';
 import { getTasks } from '../api/tasks';
 import { getUsers } from '../api/users';
 import { STATUS_CONFIG } from '../utils/statusConfig';
@@ -24,8 +24,12 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function FileRow({ file, projectId }: { file: ProjectFile; projectId: number }) {
+function FileRow({
+  file, projectId, isAdmin, onDelete,
+}: { file: ProjectFile; projectId: number; isAdmin: boolean; onDelete: () => void }) {
   const [downloading, setDownloading] = useState(false);
+  // Two-step delete: null → 'first' → 'second'
+  const [deleteStep, setDeleteStep] = useState<null | 'first' | 'second'>(null);
 
   async function handleDownload() {
     setDownloading(true);
@@ -49,14 +53,57 @@ function FileRow({ file, projectId }: { file: ProjectFile; projectId: number }) 
           </p>
         </div>
       </div>
-      <button
-        onClick={handleDownload}
-        disabled={downloading}
-        className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-zinc-200 text-zinc-500 disabled:opacity-40"
-        title="Download"
-      >
-        {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-      </button>
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button
+          onClick={handleDownload}
+          disabled={downloading}
+          className="p-1.5 rounded hover:bg-zinc-200 text-zinc-500 disabled:opacity-40"
+          title="Download"
+        >
+          {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+        </button>
+        {isAdmin && (
+          deleteStep === null ? (
+            <button
+              onClick={() => setDeleteStep('first')}
+              className="p-1.5 rounded text-zinc-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+              title="Delete file"
+            >
+              <Trash2 size={14} />
+            </button>
+          ) : deleteStep === 'first' ? (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setDeleteStep('second')}
+                className="px-2 py-0.5 rounded text-[11px] bg-red-100 text-red-600 hover:bg-red-200 font-medium"
+              >
+                Delete?
+              </button>
+              <button
+                onClick={() => setDeleteStep(null)}
+                className="px-2 py-0.5 rounded text-[11px] text-zinc-400 hover:bg-zinc-100"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => { onDelete(); setDeleteStep(null); }}
+                className="px-2 py-0.5 rounded text-[11px] bg-red-600 text-white hover:bg-red-700 font-medium"
+              >
+                Yes, delete
+              </button>
+              <button
+                onClick={() => setDeleteStep(null)}
+                className="px-2 py-0.5 rounded text-[11px] text-zinc-400 hover:bg-zinc-100"
+              >
+                Cancel
+              </button>
+            </div>
+          )
+        )}
+      </div>
     </div>
   );
 }
@@ -69,6 +116,8 @@ export default function ProjectDetailPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [manageMembers, setManageMembers] = useState(false);
   const [pendingMemberIds, setPendingMemberIds] = useState<number[]>([]);
+  const [renamingProject, setRenamingProject] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
@@ -102,6 +151,25 @@ export default function ProjectDetailPage() {
     onError: () => {
       toast.error('Upload failed');
     },
+  });
+
+  const renameProjectMutation = useMutation({
+    mutationFn: (name: string) => updateProject(projectId, { name }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+      toast.success('Project renamed');
+      setRenamingProject(false);
+    },
+    onError: () => toast.error('Failed to rename project'),
+  });
+
+  const deleteFileMutation = useMutation({
+    mutationFn: (fileId: number) => deleteProjectFile(projectId, fileId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project-files', projectId] });
+      toast.success('File deleted');
+    },
+    onError: () => toast.error('Failed to delete file'),
   });
 
   const updateMembersMutation = useMutation({
@@ -153,7 +221,46 @@ export default function ProjectDetailPage() {
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h2 className="text-lg font-semibold text-zinc-800">{project?.name}</h2>
+            {renamingProject ? (
+              <div className="flex items-center gap-2">
+                <input
+                  autoFocus
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && renameValue.trim()) renameProjectMutation.mutate(renameValue.trim());
+                    if (e.key === 'Escape') setRenamingProject(false);
+                  }}
+                  className="text-lg font-semibold text-zinc-800 border border-blue-400 rounded-lg px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+                />
+                <button
+                  onClick={() => renameValue.trim() && renameProjectMutation.mutate(renameValue.trim())}
+                  disabled={!renameValue.trim() || renameProjectMutation.isPending}
+                  className="p-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  <Check size={13} />
+                </button>
+                <button
+                  onClick={() => setRenamingProject(false)}
+                  className="p-1.5 rounded-lg border border-zinc-300 text-zinc-500 hover:bg-zinc-50"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 group">
+                <h2 className="text-lg font-semibold text-zinc-800">{project?.name}</h2>
+                {isAdmin && (
+                  <button
+                    onClick={() => { setRenameValue(project?.name ?? ''); setRenamingProject(true); }}
+                    className="opacity-0 group-hover:opacity-100 p-1 rounded text-zinc-400 hover:text-blue-600 hover:bg-blue-50 transition-all"
+                    title="Rename project"
+                  >
+                    <Pencil size={13} />
+                  </button>
+                )}
+              </div>
+            )}
             {project?.description && (
               <p className="text-sm text-zinc-500 mt-1">{project.description}</p>
             )}
@@ -373,7 +480,13 @@ export default function ProjectDetailPage() {
               ) : (
                 <div className="divide-y divide-zinc-100">
                   {files.map((file) => (
-                    <FileRow key={file.id} file={file} projectId={projectId} />
+                    <FileRow
+                      key={file.id}
+                      file={file}
+                      projectId={projectId}
+                      isAdmin={!!isAdmin}
+                      onDelete={() => deleteFileMutation.mutate(file.id)}
+                    />
                   ))}
                 </div>
               )}
