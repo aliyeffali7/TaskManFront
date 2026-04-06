@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Upload, FileText, Download, Loader2 } from 'lucide-react';
+import { Plus, Upload, FileText, Download, Loader2, Users, X, Check } from 'lucide-react';
 import { toast } from 'sonner';
-import { getProject, getProjectFiles, uploadProjectFile } from '../api/projects';
+import { getProject, getProjectFiles, uploadProjectFile, updateProject, downloadProjectFile } from '../api/projects';
 import { getTasks } from '../api/tasks';
+import { getUsers } from '../api/users';
 import { STATUS_CONFIG } from '../utils/statusConfig';
 import { useAuthStore } from '../store/authStore';
 import SlideOver from '../components/ui/SlideOver';
@@ -23,7 +24,20 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function FileRow({ file }: { file: ProjectFile }) {
+function FileRow({ file, projectId }: { file: ProjectFile; projectId: number }) {
+  const [downloading, setDownloading] = useState(false);
+
+  async function handleDownload() {
+    setDownloading(true);
+    try {
+      await downloadProjectFile(projectId, file.id, file.file_name);
+    } catch {
+      toast.error('Download failed');
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   return (
     <div className="flex items-center justify-between py-2.5 px-4 hover:bg-zinc-50 transition-colors group">
       <div className="flex items-center gap-3 min-w-0">
@@ -35,16 +49,14 @@ function FileRow({ file }: { file: ProjectFile }) {
           </p>
         </div>
       </div>
-      <a
-        href={file.file_url}
-        download={file.file_name}
-        target="_blank"
-        rel="noreferrer"
-        className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-zinc-200 text-zinc-500"
+      <button
+        onClick={handleDownload}
+        disabled={downloading}
+        className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-zinc-200 text-zinc-500 disabled:opacity-40"
         title="Download"
       >
-        <Download size={14} />
-      </a>
+        {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+      </button>
     </div>
   );
 }
@@ -55,6 +67,8 @@ export default function ProjectDetailPage() {
   const currentUser = useAuthStore((s) => s.user);
   const isAdmin = currentUser?.is_admin;
   const [createOpen, setCreateOpen] = useState(false);
+  const [manageMembers, setManageMembers] = useState(false);
+  const [pendingMemberIds, setPendingMemberIds] = useState<number[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
@@ -73,6 +87,12 @@ export default function ProjectDetailPage() {
     queryFn: () => getProjectFiles(projectId),
   });
 
+  const { data: allUsers } = useQuery({
+    queryKey: ['users'],
+    queryFn: getUsers,
+    enabled: manageMembers,
+  });
+
   const uploadMutation = useMutation({
     mutationFn: (file: File) => uploadProjectFile(projectId, file),
     onSuccess: () => {
@@ -83,6 +103,27 @@ export default function ProjectDetailPage() {
       toast.error('Upload failed');
     },
   });
+
+  const updateMembersMutation = useMutation({
+    mutationFn: (member_ids: number[]) => updateProject(projectId, { member_ids }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+      toast.success('Members updated');
+      setManageMembers(false);
+    },
+    onError: () => toast.error('Failed to update members'),
+  });
+
+  function openManageMembers() {
+    setPendingMemberIds(project?.members.map((m) => m.id) ?? []);
+    setManageMembers(true);
+  }
+
+  function togglePendingMember(uid: number) {
+    setPendingMemberIds((prev) =>
+      prev.includes(uid) ? prev.filter((x) => x !== uid) : [...prev, uid],
+    );
+  }
 
   const visibleTasks = isAdmin
     ? tasks
@@ -104,18 +145,17 @@ export default function ProjectDetailPage() {
     );
   }
 
+  const activeUsers = allUsers?.filter((u) => u.is_active) ?? [];
+
   return (
     <>
       <div className="p-6 h-full flex flex-col">
         {/* Header */}
-        <div className="flex items-start justify-between mb-6">
+        <div className="flex items-start justify-between mb-4">
           <div>
             <h2 className="text-lg font-semibold text-zinc-800">{project?.name}</h2>
             {project?.description && (
               <p className="text-sm text-zinc-500 mt-1">{project.description}</p>
-            )}
-            {project && (
-              <p className="text-xs text-zinc-400 mt-1">{project.members.length} members</p>
             )}
           </div>
           {isAdmin && (
@@ -126,6 +166,86 @@ export default function ProjectDetailPage() {
               <Plus size={13} />
               New Task
             </button>
+          )}
+        </div>
+
+        {/* Members section */}
+        <div className="mb-5">
+          <div className="flex items-center gap-2 mb-2">
+            <Users size={13} className="text-zinc-400" />
+            <span className="text-xs text-zinc-400 font-medium">
+              {project?.members.length ?? 0} member{project?.members.length !== 1 ? 's' : ''}
+            </span>
+            {isAdmin && !manageMembers && (
+              <button
+                onClick={openManageMembers}
+                className="ml-1 text-xs text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Manage
+              </button>
+            )}
+          </div>
+
+          {!manageMembers ? (
+            <div className="flex flex-wrap gap-1.5">
+              {project?.members.map((m) => (
+                <span
+                  key={m.id}
+                  className="inline-flex items-center px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600 text-xs border border-zinc-200"
+                >
+                  {m.full_name}
+                </span>
+              ))}
+              {!project?.members.length && (
+                <span className="text-xs text-zinc-400">No members yet.</span>
+              )}
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg border border-zinc-300 p-4 space-y-3 max-w-lg">
+              <p className="text-xs font-medium text-zinc-600">Select project members:</p>
+              <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto">
+                {activeUsers.length === 0 ? (
+                  <p className="text-xs text-zinc-400">Loading users…</p>
+                ) : (
+                  activeUsers.map((u) => {
+                    const selected = pendingMemberIds.includes(u.id);
+                    return (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => togglePendingMember(u.id)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                          selected
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-zinc-600 border-zinc-300 hover:border-zinc-400'
+                        }`}
+                      >
+                        {selected && <Check size={10} />}
+                        {u.full_name}
+                        <span className="opacity-60">{u.role_label}</span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  onClick={() => updateMembersMutation.mutate(pendingMemberIds)}
+                  disabled={updateMembersMutation.isPending}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-60 transition-colors"
+                >
+                  <Check size={11} />
+                  {updateMembersMutation.isPending ? 'Saving…' : 'Save'}
+                </button>
+                <button
+                  onClick={() => setManageMembers(false)}
+                  className="flex items-center gap-1 px-3 py-1.5 border border-zinc-300 text-zinc-500 text-xs font-medium rounded-lg hover:bg-zinc-50 transition-colors"
+                >
+                  <X size={11} />
+                  Cancel
+                </button>
+              </div>
+            </div>
           )}
         </div>
 
@@ -253,7 +373,7 @@ export default function ProjectDetailPage() {
               ) : (
                 <div className="divide-y divide-zinc-100">
                   {files.map((file) => (
-                    <FileRow key={file.id} file={file} />
+                    <FileRow key={file.id} file={file} projectId={projectId} />
                   ))}
                 </div>
               )}
@@ -263,7 +383,11 @@ export default function ProjectDetailPage() {
       </div>
 
       <SlideOver open={createOpen} onClose={() => setCreateOpen(false)} title="New Task">
-        <CreateTaskForm projectId={projectId} onClose={() => setCreateOpen(false)} />
+        <CreateTaskForm
+          projectId={projectId}
+          members={project?.members ?? []}
+          onClose={() => setCreateOpen(false)}
+        />
       </SlideOver>
     </>
   );

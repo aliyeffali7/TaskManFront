@@ -89,6 +89,36 @@ export interface Ticket {
   updated_at: string;
 }
 
+export interface DriveFolder {
+  id: number;
+  name: string;
+  parent: number | null;
+  created_by: User;
+  children_count: number;
+  files_count: number;
+  created_at: string;
+}
+
+export interface DriveFile {
+  id: number;
+  folder: number | null;
+  file_url: string;
+  file_name: string;
+  file_size: number;
+  mime_type: string;
+  uploaded_by: User;
+  created_at: string;
+}
+
+export interface DriveContents {
+  folders: DriveFolder[];
+  files: DriveFile[];
+}
+
+export interface DriveFolderContents extends DriveContents {
+  folder: DriveFolder;
+}
+
 export type NotificationType =
   | 'task_assigned'
   | 'task_unblocked'

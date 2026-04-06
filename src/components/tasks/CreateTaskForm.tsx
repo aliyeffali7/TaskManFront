@@ -4,8 +4,7 @@ import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { createTask, getTasks } from '../../api/tasks';
-import { getUsers } from '../../api/users';
-import type { TaskStatus, TaskPriority } from '../../types';
+import type { TaskStatus, TaskPriority, User } from '../../types';
 
 const schema = z.object({
   title: z.string().min(1, 'Title is required'),
@@ -21,16 +20,16 @@ type FormValues = z.infer<typeof schema>;
 
 interface Props {
   projectId: number;
+  members: User[];
   onClose: () => void;
 }
 
 const INPUT = 'w-full bg-white border border-zinc-300 rounded-lg px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent';
 const SELECT = 'w-full bg-white border border-zinc-300 rounded-lg px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500';
 
-export default function CreateTaskForm({ projectId, onClose }: Props) {
+export default function CreateTaskForm({ projectId, members, onClose }: Props) {
   const queryClient = useQueryClient();
 
-  const { data: users } = useQuery({ queryKey: ['users'], queryFn: getUsers });
   const { data: existingTasks } = useQuery({ queryKey: ['tasks', projectId], queryFn: () => getTasks(projectId) });
 
   const { mutate, isPending } = useMutation({
@@ -62,6 +61,8 @@ export default function CreateTaskForm({ projectId, onClose }: Props) {
       selectedPrereqs.includes(id) ? selectedPrereqs.filter((x) => x !== id) : [...selectedPrereqs, id],
     );
   };
+
+  const activeMembers = members.filter((u) => u.is_active);
 
   return (
     <form onSubmit={handleSubmit((v) => mutate(v))} className="space-y-4">
@@ -104,10 +105,13 @@ export default function CreateTaskForm({ projectId, onClose }: Props) {
             className={SELECT}
           >
             <option value="">Unassigned</option>
-            {users?.filter((u) => u.is_active).map((u) => (
+            {activeMembers.map((u) => (
               <option key={u.id} value={u.id}>{u.full_name} — {u.role_label}</option>
             ))}
           </select>
+          {activeMembers.length === 0 && (
+            <p className="mt-1 text-xs text-zinc-400">No members in this project.</p>
+          )}
         </div>
         <div>
           <label className="block text-xs font-medium text-zinc-600 mb-1">Due date</label>

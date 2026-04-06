@@ -11,6 +11,7 @@ import NotificationsPage from '../pages/NotificationsPage';
 import AdminPage from '../pages/AdminPage';
 import UsersPage from '../pages/UsersPage';
 import CalendarPage from '../pages/CalendarPage';
+import DrivePage from '../pages/DrivePage';
 
 function AuthGuard() {
   const token = useAuthStore((s) => s.accessToken);
@@ -45,6 +46,7 @@ export const router = createBrowserRouter([
             element: <AdminGuard />,
             children: [
               { path: '/projects', element: <ProjectsPage /> },
+              { path: '/drive', element: <DrivePage /> },
               { path: '/users', element: <UsersPage /> },
               { path: '/admin', element: <AdminPage /> },
             ],

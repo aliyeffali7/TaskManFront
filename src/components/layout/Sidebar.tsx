@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, FolderOpen, Ticket, Bell, Users, Settings, LogOut, CalendarDays, CheckSquare2 } from 'lucide-react';
+import { LayoutDashboard, FolderOpen, Ticket, Bell, Users, Settings, LogOut, CalendarDays, CheckSquare2, HardDrive } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { logout } from '../../api/auth';
 import { toast } from 'sonner';
@@ -13,6 +13,7 @@ const navItems = [
 
 const adminNavItems = [
   { to: '/projects', icon: FolderOpen, label: 'Projects' },
+  { to: '/drive', icon: HardDrive, label: 'Drive' },
   { to: '/users', icon: Users, label: 'Users' },
   { to: '/admin', icon: Settings, label: 'Admin' },
 ];

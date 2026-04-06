@@ -7,7 +7,7 @@ export const getUsers = () =>
 export const createUser = (data: { email: string; full_name: string; password: string; role_label: string; is_admin: boolean }) =>
   api.post<User>('/users/', data).then((r) => r.data);
 
-export const updateUser = (id: number, data: { full_name?: string; role_label?: string; is_admin?: boolean; is_active?: boolean }) =>
+export const updateUser = (id: number, data: { full_name?: string; role_label?: string; is_admin?: boolean; is_active?: boolean; password?: string }) =>
   api.patch<User>(`/users/${id}/`, data).then((r) => r.data);
 
 export const deactivateUser = (id: number) =>
