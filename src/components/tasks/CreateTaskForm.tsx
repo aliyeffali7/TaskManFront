@@ -23,8 +23,10 @@ type FormValues = z.infer<typeof schema>;
 interface DraftSubTask {
   id: string;
   title: string;
+  description: string;
   status: TaskStatus;
   priority: TaskPriority;
+  assigned_to_ids: number[];
 }
 
 interface Props {
@@ -36,10 +38,112 @@ interface Props {
 const INPUT = 'w-full bg-white border border-zinc-300 rounded-lg px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent';
 const SELECT = 'w-full bg-white border border-zinc-300 rounded-lg px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500';
 
-const STATUS_LABELS: Record<TaskStatus, string> = {
-  todo: 'To Do', blocked: 'Blocked', in_progress: 'In Progress', in_review: 'In Review', done: 'Done',
+const STATUS_LABELS: Record<string, string> = {
+  todo: 'To Do', in_progress: 'In Progress', in_review: 'In Review', done: 'Done',
 };
-const PRIORITY_LABELS: Record<TaskPriority, string> = { low: 'Low', medium: 'Medium', high: 'High' };
+const PRIORITY_LABELS: Record<string, string> = { low: 'Low', medium: 'Medium', high: 'High' };
+
+function SubTaskDraftRow({
+  draft,
+  members,
+  onRemove,
+  onChange,
+}: {
+  draft: DraftSubTask;
+  members: User[];
+  onRemove: () => void;
+  onChange: (updated: Partial<DraftSubTask>) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  function toggleAssignee(id: number) {
+    onChange({
+      assigned_to_ids: draft.assigned_to_ids.includes(id)
+        ? draft.assigned_to_ids.filter((x) => x !== id)
+        : [...draft.assigned_to_ids, id],
+    });
+  }
+
+  const assignedNames = members
+    .filter((u) => draft.assigned_to_ids.includes(u.id))
+    .map((u) => u.full_name.split(' ')[0])
+    .join(', ');
+
+  return (
+    <div className="border-b border-zinc-100 last:border-0">
+      {/* Compact row */}
+      <div className="flex items-center gap-2 px-3 py-2">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="text-zinc-400 hover:text-zinc-600 transition-colors shrink-0"
+        >
+          {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+        </button>
+        <span className="flex-1 text-xs text-zinc-800 truncate">{draft.title}</span>
+        {!expanded && assignedNames && (
+          <span className="text-[11px] text-zinc-400 shrink-0">{assignedNames}</span>
+        )}
+        <select
+          value={draft.status}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => onChange({ status: e.target.value as TaskStatus })}
+          className="text-[11px] border border-zinc-200 rounded px-1.5 py-0.5 text-zinc-600 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+        >
+          {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+        <select
+          value={draft.priority}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => onChange({ priority: e.target.value as TaskPriority })}
+          className="text-[11px] border border-zinc-200 rounded px-1.5 py-0.5 text-zinc-600 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+        >
+          {Object.entries(PRIORITY_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+        <button type="button" onClick={onRemove} className="text-zinc-400 hover:text-red-500 transition-colors shrink-0">
+          <X size={13} />
+        </button>
+      </div>
+
+      {/* Expanded details */}
+      {expanded && (
+        <div className="px-3 pb-3 space-y-2.5 bg-zinc-50 border-t border-zinc-100">
+          <div className="pt-2.5">
+            <textarea
+              value={draft.description}
+              onChange={(e) => onChange({ description: e.target.value })}
+              placeholder="Description (optional)"
+              rows={2}
+              className="w-full bg-white border border-zinc-200 rounded-lg px-3 py-2 text-xs text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            />
+          </div>
+          {members.length > 0 && (
+            <div>
+              <p className="text-[11px] font-medium text-zinc-500 mb-1.5">Assign to</p>
+              <div className="flex flex-wrap gap-1.5">
+                {members.filter((u) => u.is_active).map((u) => {
+                  const selected = draft.assigned_to_ids.includes(u.id);
+                  return (
+                    <button
+                      key={u.id}
+                      type="button"
+                      onClick={() => toggleAssignee(u.id)}
+                      className={`px-2 py-0.5 rounded text-[11px] font-medium border transition-colors ${
+                        selected ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400'
+                      }`}
+                    >
+                      {u.full_name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function CreateTaskForm({ projectId, members, onClose }: Props) {
   const queryClient = useQueryClient();
@@ -60,12 +164,13 @@ export default function CreateTaskForm({ projectId, members, onClose }: Props) {
         assigned_to_ids: data.assigned_to_ids ?? [],
         prerequisite_ids: data.prerequisite_ids ?? [],
       });
-      // Create subtasks sequentially
       for (const draft of drafts) {
         await createSubTask(task.id, {
           title: draft.title,
+          description: draft.description || undefined,
           status: draft.status,
           priority: draft.priority,
+          assigned_to_ids: draft.assigned_to_ids,
         });
       }
       return task;
@@ -105,7 +210,7 @@ export default function CreateTaskForm({ projectId, members, onClose }: Props) {
     if (!newSubTitle.trim()) return;
     setDrafts((prev) => [
       ...prev,
-      { id: crypto.randomUUID(), title: newSubTitle.trim(), status: 'todo', priority: 'medium' },
+      { id: crypto.randomUUID(), title: newSubTitle.trim(), description: '', status: 'todo', priority: 'medium', assigned_to_ids: [] },
     ]);
     setNewSubTitle('');
   }
@@ -114,8 +219,8 @@ export default function CreateTaskForm({ projectId, members, onClose }: Props) {
     setDrafts((prev) => prev.filter((d) => d.id !== id));
   }
 
-  function updateDraft(id: string, field: 'status' | 'priority', value: string) {
-    setDrafts((prev) => prev.map((d) => d.id === id ? { ...d, [field]: value } : d));
+  function updateDraft(id: string, patch: Partial<DraftSubTask>) {
+    setDrafts((prev) => prev.map((d) => d.id === id ? { ...d, ...patch } : d));
   }
 
   return (
@@ -189,7 +294,7 @@ export default function CreateTaskForm({ projectId, members, onClose }: Props) {
         <input {...register('due_date')} type="date" className={INPUT} />
       </div>
 
-      {/* Prerequisites — collapsible clean list */}
+      {/* Prerequisites — collapsible */}
       {existingTasks && existingTasks.length > 0 && (
         <div className="border border-zinc-200 rounded-lg overflow-hidden">
           <button
@@ -212,10 +317,7 @@ export default function CreateTaskForm({ projectId, members, onClose }: Props) {
               {existingTasks.map((t) => {
                 const selected = selectedPrereqs.includes(t.id);
                 return (
-                  <label
-                    key={t.id}
-                    className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-zinc-50 transition-colors"
-                  >
+                  <label key={t.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-zinc-50 transition-colors">
                     <input
                       type="checkbox"
                       checked={selected}
@@ -242,35 +344,19 @@ export default function CreateTaskForm({ projectId, members, onClose }: Props) {
               </span>
             )}
           </span>
+          <span className="text-[11px] text-zinc-400">Click ▾ on a subtask to add details</span>
         </div>
 
         {drafts.length > 0 && (
-          <div className="divide-y divide-zinc-100">
+          <div>
             {drafts.map((draft) => (
-              <div key={draft.id} className="flex items-center gap-2 px-3 py-2">
-                <span className="flex-1 text-xs text-zinc-800 truncate">{draft.title}</span>
-                <select
-                  value={draft.status}
-                  onChange={(e) => updateDraft(draft.id, 'status', e.target.value)}
-                  className="text-[11px] border border-zinc-200 rounded px-1.5 py-0.5 text-zinc-600 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                >
-                  {(Object.entries(STATUS_LABELS) as [TaskStatus, string][])
-                    .filter(([v]) => v !== 'blocked')
-                    .map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                </select>
-                <select
-                  value={draft.priority}
-                  onChange={(e) => updateDraft(draft.id, 'priority', e.target.value)}
-                  className="text-[11px] border border-zinc-200 rounded px-1.5 py-0.5 text-zinc-600 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                >
-                  {(Object.entries(PRIORITY_LABELS) as [TaskPriority, string][]).map(([v, l]) => (
-                    <option key={v} value={v}>{l}</option>
-                  ))}
-                </select>
-                <button type="button" onClick={() => removeDraft(draft.id)} className="text-zinc-400 hover:text-red-500 transition-colors">
-                  <X size={13} />
-                </button>
-              </div>
+              <SubTaskDraftRow
+                key={draft.id}
+                draft={draft}
+                members={activeMembers}
+                onRemove={() => removeDraft(draft.id)}
+                onChange={(patch) => updateDraft(draft.id, patch)}
+              />
             ))}
           </div>
         )}
