@@ -1,5 +1,5 @@
 import api from './axios';
-import type { Task, TaskStatus, TaskPriority } from '../types';
+import type { Task, SubTask, TaskStatus, TaskPriority } from '../types';
 
 export interface TaskCreatePayload {
   title: string;
@@ -43,6 +43,27 @@ export const updateTaskStatus = (id: number, status: TaskStatus) =>
 
 export const deleteTask = (id: number) =>
   api.delete(`/tasks/${id}/`).then((r) => r.data);
+
+export interface SubTaskPayload {
+  title: string;
+  description?: string;
+  assigned_to_ids?: number[];
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  due_date?: string | null;
+}
+
+export const getSubTasks = (taskId: number) =>
+  api.get<SubTask[]>(`/tasks/${taskId}/subtasks/`).then((r) => r.data);
+
+export const createSubTask = (taskId: number, data: SubTaskPayload) =>
+  api.post<SubTask>(`/tasks/${taskId}/subtasks/`, data).then((r) => r.data);
+
+export const updateSubTask = (taskId: number, subId: number, data: Partial<SubTaskPayload>) =>
+  api.patch<SubTask>(`/tasks/${taskId}/subtasks/${subId}/`, data).then((r) => r.data);
+
+export const deleteSubTask = (taskId: number, subId: number) =>
+  api.delete(`/tasks/${taskId}/subtasks/${subId}/`).then((r) => r.data);
 
 export const getCalendarTasks = (year: number, month: number) => {
   const m = String(month + 1).padStart(2, '0');

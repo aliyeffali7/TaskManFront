@@ -12,6 +12,21 @@ export interface User {
 export type TaskStatus = 'todo' | 'blocked' | 'in_progress' | 'in_review' | 'done';
 export type TaskPriority = 'low' | 'medium' | 'high';
 
+export interface SubTask {
+  id: number;
+  parent: number;
+  title: string;
+  description: string;
+  assigned_to: User[];
+  created_by: User | null;
+  status: TaskStatus;
+  priority: TaskPriority;
+  due_date: string | null;
+  order: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Task {
   id: number;
   project: number;
@@ -23,6 +38,7 @@ export interface Task {
   priority: TaskPriority;
   due_date: string | null;
   prerequisites: number[];
+  subtasks: SubTask[];
   order: number;
   created_at: string;
   updated_at: string;
