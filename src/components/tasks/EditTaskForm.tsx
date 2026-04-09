@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { updateTask, getTasks } from '../../api/tasks';
 import { getProject } from '../../api/projects';
 import type { Task } from '../../types';
@@ -29,6 +31,7 @@ const SELECT = 'w-full bg-white border border-zinc-300 rounded-lg px-3 py-2 text
 
 export default function EditTaskForm({ task, onClose }: Props) {
   const queryClient = useQueryClient();
+  const [prereqOpen, setPrereqOpen] = useState(false);
 
   const { data: project } = useQuery({ queryKey: ['project', task.project], queryFn: () => getProject(task.project) });
   const { data: existingTasks } = useQuery({ queryKey: ['tasks', task.project], queryFn: () => getTasks(task.project) });
@@ -71,9 +74,7 @@ export default function EditTaskForm({ task, onClose }: Props) {
   function toggleAssignee(id: number) {
     setValue(
       'assigned_to_ids',
-      selectedAssignees.includes(id)
-        ? selectedAssignees.filter((x) => x !== id)
-        : [...selectedAssignees, id],
+      selectedAssignees.includes(id) ? selectedAssignees.filter((x) => x !== id) : [...selectedAssignees, id],
     );
   }
 
@@ -86,17 +87,20 @@ export default function EditTaskForm({ task, onClose }: Props) {
 
   return (
     <form onSubmit={handleSubmit((v) => mutate(v))} className="space-y-4">
+      {/* Title */}
       <div>
         <label className="block text-xs font-medium text-zinc-600 mb-1">Title *</label>
         <input {...register('title')} className={INPUT} />
         {errors.title && <p className="mt-1 text-xs text-red-500">{errors.title.message}</p>}
       </div>
 
+      {/* Description */}
       <div>
         <label className="block text-xs font-medium text-zinc-600 mb-1">Description</label>
         <textarea {...register('description')} rows={3} className={`${INPUT} resize-none`} />
       </div>
 
+      {/* Status + Priority */}
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium text-zinc-600 mb-1">Status</label>
@@ -117,6 +121,7 @@ export default function EditTaskForm({ task, onClose }: Props) {
         </div>
       </div>
 
+      {/* Assign to */}
       <div>
         <label className="block text-xs font-medium text-zinc-600 mb-2">
           Assign to
@@ -134,9 +139,7 @@ export default function EditTaskForm({ task, onClose }: Props) {
                   type="button"
                   onClick={() => toggleAssignee(u.id)}
                   className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
-                    selected
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white text-zinc-600 border-zinc-300 hover:border-zinc-400'
+                    selected ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-zinc-600 border-zinc-300 hover:border-zinc-400'
                   }`}
                 >
                   {u.full_name}
@@ -147,32 +150,55 @@ export default function EditTaskForm({ task, onClose }: Props) {
         )}
       </div>
 
+      {/* Due date */}
       <div>
         <label className="block text-xs font-medium text-zinc-600 mb-1">Due date</label>
         <input {...register('due_date')} type="date" className={INPUT} />
       </div>
 
+      {/* Prerequisites — collapsible clean list */}
       {otherTasks.length > 0 && (
-        <div>
-          <label className="block text-xs font-medium text-zinc-600 mb-2">
-            Prerequisites
-            {selectedPrereqs.length > 0 && <span className="ml-1 text-zinc-400">({selectedPrereqs.length})</span>}
-          </label>
-          <div className="flex flex-wrap gap-1.5">
-            {otherTasks.map((t) => {
-              const selected = selectedPrereqs.includes(t.id);
-              return (
-                <button key={t.id} type="button" onClick={() => togglePrereq(t.id)}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${selected ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-zinc-600 border-zinc-300 hover:border-zinc-400'}`}
-                >
-                  {t.title}
-                </button>
-              );
-            })}
-          </div>
+        <div className="border border-zinc-200 rounded-lg overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setPrereqOpen((v) => !v)}
+            className="w-full flex items-center justify-between px-3 py-2.5 bg-zinc-50 hover:bg-zinc-100 transition-colors text-left"
+          >
+            <span className="text-xs font-medium text-zinc-600">
+              Prerequisites
+              {selectedPrereqs.length > 0 && (
+                <span className="ml-2 inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] font-bold">
+                  {selectedPrereqs.length}
+                </span>
+              )}
+            </span>
+            {prereqOpen ? <ChevronUp size={13} className="text-zinc-400" /> : <ChevronDown size={13} className="text-zinc-400" />}
+          </button>
+          {prereqOpen && (
+            <div className="divide-y divide-zinc-100 max-h-44 overflow-y-auto">
+              {otherTasks.map((t) => {
+                const selected = selectedPrereqs.includes(t.id);
+                return (
+                  <label
+                    key={t.id}
+                    className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-zinc-50 transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={() => togglePrereq(t.id)}
+                      className="w-3.5 h-3.5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                    <span className="text-xs text-zinc-700 truncate">{t.title}</span>
+                  </label>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
+      {/* Actions */}
       <div className="flex gap-2 pt-1">
         <button type="button" onClick={onClose} className="flex-1 py-2.5 border border-zinc-300 text-zinc-600 text-sm font-medium rounded-lg hover:bg-zinc-50 transition-colors">
           Cancel
