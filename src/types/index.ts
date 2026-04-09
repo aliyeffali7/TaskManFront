@@ -17,7 +17,7 @@ export interface Task {
   project: number;
   title: string;
   description: string;
-  assigned_to: User | null;
+  assigned_to: User[];
   created_by: User | null;
   status: TaskStatus;
   priority: TaskPriority;

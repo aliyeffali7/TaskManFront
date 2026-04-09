@@ -195,7 +195,7 @@ export default function ProjectDetailPage() {
 
   const visibleTasks = isAdmin
     ? tasks
-    : tasks?.filter((t) => t.assigned_to?.id === currentUser?.id);
+    : tasks?.filter((t) => t.assigned_to.some((u) => u.id === currentUser?.id));
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -416,9 +416,17 @@ export default function ProjectDetailPage() {
                               {task.priority}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-zinc-500">
-                            {task.assigned_to?.full_name ?? (
+                          <td className="px-4 py-3">
+                            {task.assigned_to.length === 0 ? (
                               <span className="text-zinc-300">—</span>
+                            ) : (
+                              <div className="flex flex-wrap gap-1">
+                                {task.assigned_to.map((u) => (
+                                  <span key={u.id} className="inline-flex px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-600 text-xs">
+                                    {u.full_name}
+                                  </span>
+                                ))}
+                              </div>
                             )}
                           </td>
                           <td className="px-4 py-3 text-zinc-400 text-xs">

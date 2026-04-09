@@ -201,7 +201,17 @@ export default function TaskDetailPage() {
               <div className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
                 <div>
                   <p className="text-xs text-zinc-400 mb-1">Assigned to</p>
-                  <p className="font-medium text-zinc-700">{task.assigned_to?.full_name ?? '—'}</p>
+                  {task.assigned_to.length === 0 ? (
+                    <p className="font-medium text-zinc-400">—</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-1 mt-0.5">
+                      {task.assigned_to.map((u) => (
+                        <span key={u.id} className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-medium border border-blue-100">
+                          {u.full_name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs text-zinc-400 mb-1">Due date</p>

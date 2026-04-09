@@ -4,7 +4,7 @@ import type { Task, TaskStatus, TaskPriority } from '../types';
 export interface TaskCreatePayload {
   title: string;
   description?: string;
-  assigned_to_id?: number | null;
+  assigned_to_ids?: number[];
   status?: TaskStatus;
   priority?: TaskPriority;
   due_date?: string | null;
@@ -15,7 +15,7 @@ export interface TaskCreatePayload {
 export interface TaskUpdatePayload {
   title?: string;
   description?: string;
-  assigned_to_id?: number | null;
+  assigned_to_ids?: number[];
   status?: TaskStatus;
   priority?: TaskPriority;
   due_date?: string | null;
