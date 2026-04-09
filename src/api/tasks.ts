@@ -29,6 +29,9 @@ export const getTasks = (projectId: number) =>
 export const getMyTasks = () =>
   api.get<Task[]>('/tasks/my/').then((r) => r.data);
 
+export const getUserTasks = (userId: number) =>
+  api.get<Task[]>('/tasks/', { params: { assigned_to: userId } }).then((r) => r.data);
+
 export const getTask = (id: number) =>
   api.get<Task>(`/tasks/${id}/`).then((r) => r.data);
 

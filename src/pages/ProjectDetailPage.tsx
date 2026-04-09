@@ -118,6 +118,8 @@ export default function ProjectDetailPage() {
   const [pendingMemberIds, setPendingMemberIds] = useState<number[]>([]);
   const [renamingProject, setRenamingProject] = useState(false);
   const [renameValue, setRenameValue] = useState('');
+  const [editingDesc, setEditingDesc] = useState(false);
+  const [descValue, setDescValue] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
@@ -161,6 +163,16 @@ export default function ProjectDetailPage() {
       setRenamingProject(false);
     },
     onError: () => toast.error('Failed to rename project'),
+  });
+
+  const updateDescMutation = useMutation({
+    mutationFn: (description: string) => updateProject(projectId, { description }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+      toast.success('Description updated');
+      setEditingDesc(false);
+    },
+    onError: () => toast.error('Failed to update description'),
   });
 
   const deleteFileMutation = useMutation({
@@ -261,8 +273,49 @@ export default function ProjectDetailPage() {
                 )}
               </div>
             )}
-            {project?.description && (
-              <p className="text-sm text-zinc-500 mt-1">{project.description}</p>
+            {editingDesc ? (
+              <div className="mt-1 flex items-start gap-2 max-w-lg">
+                <textarea
+                  autoFocus
+                  value={descValue}
+                  onChange={(e) => setDescValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') setEditingDesc(false);
+                  }}
+                  rows={3}
+                  className="flex-1 text-sm text-zinc-700 border border-blue-400 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                />
+                <div className="flex flex-col gap-1 shrink-0">
+                  <button
+                    onClick={() => updateDescMutation.mutate(descValue)}
+                    disabled={updateDescMutation.isPending}
+                    className="p-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    <Check size={13} />
+                  </button>
+                  <button
+                    onClick={() => setEditingDesc(false)}
+                    className="p-1.5 rounded-lg border border-zinc-300 text-zinc-500 hover:bg-zinc-50"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start gap-1 group mt-1">
+                <p className="text-sm text-zinc-500">
+                  {project?.description || (isAdmin ? <span className="text-zinc-300 italic">No description</span> : '')}
+                </p>
+                {isAdmin && (
+                  <button
+                    onClick={() => { setDescValue(project?.description ?? ''); setEditingDesc(true); }}
+                    className="opacity-0 group-hover:opacity-100 p-1 rounded text-zinc-400 hover:text-blue-600 hover:bg-blue-50 transition-all shrink-0"
+                    title="Edit description"
+                  >
+                    <Pencil size={12} />
+                  </button>
+                )}
+              </div>
             )}
           </div>
           {isAdmin && (

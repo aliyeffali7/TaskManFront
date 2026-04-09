@@ -3,9 +3,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { Link } from 'react-router-dom';
 import { Plus, X, Pencil, Trash2, Check, Eye, EyeOff } from 'lucide-react';
 import { getUsers, createUser, updateUser, deleteUser } from '../api/users';
+import { getUserTasks } from '../api/tasks';
+import { STATUS_CONFIG } from '../utils/statusConfig';
+import SlideOver from '../components/ui/SlideOver';
 import { toast } from 'sonner';
+import type { User } from '../types';
 
 const createSchema = z.object({
   full_name: z.string().min(1, 'Required'),
@@ -101,11 +106,59 @@ function EditUserRow({ userId, defaultValues, onDone }: { userId: number; defaul
   );
 }
 
+function UserTasksPanel({ user }: { user: User }) {
+  const { data: tasks, isLoading } = useQuery({
+    queryKey: ['user-tasks', user.id],
+    queryFn: () => getUserTasks(user.id),
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-12 bg-zinc-100 rounded-lg animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (!tasks?.length) {
+    return <p className="text-sm text-zinc-400">No tasks assigned to {user.full_name}.</p>;
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-zinc-400 mb-3">{tasks.length} task{tasks.length !== 1 ? 's' : ''} assigned</p>
+      {tasks.map((task) => {
+        const config = STATUS_CONFIG[task.status];
+        return (
+          <Link
+            key={task.id}
+            to={`/tasks/${task.id}`}
+            className="block bg-white border border-zinc-200 rounded-lg px-3 py-2.5 hover:border-zinc-300 hover:bg-zinc-50 transition-colors"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <span className="text-sm font-medium text-zinc-800 leading-snug">{task.title}</span>
+              <span className={`shrink-0 inline-flex px-2 py-0.5 rounded text-xs font-medium ${config.color}`}>
+                {config.label}
+              </span>
+            </div>
+            {task.due_date && (
+              <p className="text-[11px] text-zinc-400 mt-1">Due {task.due_date}</p>
+            )}
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function UsersPage() {
   const [showForm, setShowForm] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const queryClient = useQueryClient();
 
   const { data: users, isLoading } = useQuery({ queryKey: ['users'], queryFn: getUsers });
@@ -219,7 +272,12 @@ export default function UsersPage() {
                 <>
                   <tr key={user.id} className={`border-b border-zinc-200 hover:bg-zinc-50 transition-colors ${editingId === user.id ? 'bg-blue-50/30' : ''}`}>
                     <td className="px-4 py-3">
-                      <span className="font-medium text-zinc-800">{user.full_name}</span>
+                      <button
+                        onClick={() => setSelectedUser(user)}
+                        className="font-medium text-zinc-800 hover:text-blue-600 transition-colors text-left"
+                      >
+                        {user.full_name}
+                      </button>
                       {user.is_admin && <span className="ml-2 text-[10px] font-medium bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100">Admin</span>}
                     </td>
                     <td className="px-4 py-3 text-zinc-500">{user.role_label}</td>
@@ -282,6 +340,14 @@ export default function UsersPage() {
           </table>
         </div>
       )}
+
+      <SlideOver
+        open={!!selectedUser}
+        onClose={() => setSelectedUser(null)}
+        title={selectedUser ? `${selectedUser.full_name}'s Tasks` : ''}
+      >
+        {selectedUser && <UserTasksPanel user={selectedUser} />}
+      </SlideOver>
     </div>
   );
 }

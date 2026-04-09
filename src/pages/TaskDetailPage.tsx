@@ -11,6 +11,7 @@ import SlideOver from '../components/ui/SlideOver';
 import EditTaskForm from '../components/tasks/EditTaskForm';
 import CommentSection from '../components/comments/CommentSection';
 import SubTaskSection from '../components/tasks/SubTaskSection';
+import TaskAttachments from '../components/tasks/TaskAttachments';
 import type { TaskStatus } from '../types';
 
 const STATUS_OPTIONS: TaskStatus[] = ['todo', 'blocked', 'in_progress', 'in_review', 'done'];
@@ -260,6 +261,10 @@ export default function TaskDetailPage() {
 
         <div className="bg-white rounded-lg border border-zinc-300 shadow-sm p-6">
           <SubTaskSection task={task} isAdmin={!!isAdmin} />
+        </div>
+
+        <div className="bg-white rounded-lg border border-zinc-300 shadow-sm p-6">
+          <TaskAttachments taskId={taskId} isAdmin={!!isAdmin} />
         </div>
 
         <div className="bg-white rounded-lg border border-zinc-300 shadow-sm p-6">
