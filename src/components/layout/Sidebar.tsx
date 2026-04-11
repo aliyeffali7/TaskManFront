@@ -38,7 +38,7 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-56 shrink-0 bg-zinc-900 flex flex-col min-h-screen border-r border-zinc-700">
+    <aside className="w-56 shrink-0 bg-zinc-900 flex flex-col h-screen border-r border-zinc-700">
       <div className="flex items-center gap-2.5 px-4 py-4 border-b border-zinc-700">
         <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
           <CheckSquare2 size={16} className="text-white" />
